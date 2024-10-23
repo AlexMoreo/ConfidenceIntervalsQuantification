@@ -72,14 +72,16 @@ class WithCIAbstract(ABC):
 
 class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
 
-    def __init__(self, quantifier: AggregativeQuantifier, n_samples=100, sample_size=0.5, confidence_level=0.95, random_state=None):
+    def __init__(self, quantifier: AggregativeQuantifier, n_samples=100, sample_size=1., confidence_level=0.95, random_state=None, df_red=False):
         assert n_samples > 1, f'{n_samples=} must be > 1'
         assert (type(sample_size) == float and sample_size > 0) or (type(sample_size) == int and sample_size > 1), \
             f'wrong value for {sample_size=}; specify a float (a proportion of the original size) or an integer'
         self.quantifier = quantifier
         self.n_samples = n_samples
         self.sample_size = sample_size
+        self.confidence_level = confidence_level
         self.random_state = random_state
+        self.df_red = df_red
 
     def aggregation_fit(self, classif_predictions: LabelledCollection, data: LabelledCollection):
         return self.quantifier.aggregation_fit(classif_predictions, data)
@@ -108,8 +110,11 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
         cov = np.cov(prevs, rowvar=False, ddof=1)
 
         # critical chi-square value
-        n_features = prevs.shape[1]  # number of variables is the number of classes
-        chi2_val = chi2.ppf(confidence_level, df=n_features)  # shoudn't this be n_features-1? they sum up to 1 so...
+        n_classes = prevs.shape[1]  # number of variables is the number of classes
+        if self.df_red:
+            chi2_val = chi2.ppf(confidence_level, df=n_classes-1)  # prevs sum up to 1, so one degrees of freedom less
+        else:
+            chi2_val = chi2.ppf(confidence_level, df=n_classes)
 
         return ConfidenceRegion(mean, cov, chi2_val)
 
@@ -117,6 +122,13 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
     def fit(self, data: LabelledCollection, fit_classifier=True, val_split=None):
         return self.quantifier.fit(data, fit_classifier, val_split)
 
-    def quantify_ci(self, instances, confidence_level=0.95):
+    def quantify_ci(self, instances, confidence_level=None):
         predictions = self.quantifier.classify(instances)
         return self.aggregate_ci(predictions, confidence_level=confidence_level)
+
+    @property
+    def classifier(self):
+        return self.quantifier.classifier
+
+    def _classifier_method(self):
+        return self.quantifier._classifier_method()
