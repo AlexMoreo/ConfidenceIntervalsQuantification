@@ -1,5 +1,5 @@
 import functools
-from functools import cache
+from functools import cache, cached_property
 
 import numpy as np
 import quapy as qp
@@ -9,81 +9,138 @@ from quapy.method.base import BaseQuantifier
 from scipy.stats import chi2
 from sklearn.utils import resample
 from abc import ABC, abstractmethod
+from scipy.special import softmax
 
 
 class ConfidenceRegion:
-    def __init__(self, mean, cov, critical):
-        self.mean = mean
-        self.cov = cov
-        self.critical = critical
 
-    @functools.cached_property
-    def precision_matrix(self):
+    def __init__(self, X, transformation, constraints, confidence_level=0.95):
+        assert 0 < confidence_level < 1, f'{confidence_level=} must be in range(0,1)'
+
+        self.transformation = transformation
+
+        X = np.asarray(X)
+        Z = transformation(X)
+
+        self.mean_Z = Z.mean(axis=0)
+        self.cov_Z = np.cov(Z, rowvar=False, ddof=1)
+
         try:
-            prec_matrix = np.linalg.inv(self.cov)
+            self.precision_matrix = np.linalg.inv(self.cov_Z)
         except:
-            prec_matrix = None
-        return prec_matrix
+            self.precision_matrix = None
 
-    def within(self, true_prev):
+        nfeats = Z.shape[1]
+        self.ddof = nfeats-constraints
+
+        # critical chi-square value
+        self.confidence_level = confidence_level
+        self.chi2_critical = chi2.ppf(confidence_level, df=self.ddof)
+
+    @functools.lru_cache
+    def mean(self):
+        return self.transformation.inverse(self.mean_Z)
+
+    def within(self, true_value, confidence_level=None):
+        """
+        confidence_level None means that the confidence_level is taken from the __init__
+        """
+        if (confidence_level is None) or (confidence_level==self.confidence_level):
+            chi2_critical = self.chi2_critical
+        else:
+            chi2_critical = chi2.ppf(confidence_level, df=self.ddof)
+
         if self.precision_matrix is None:
             return False
 
-        # Mahalanobis distance
-        diff = true_prev - self.mean
+        true_value = self.transformation(true_value)
+
+        # if X~N(mean, cov) then (X-mean).T cov^(-1) (X-mean) ~ chi2(df)
+        diff = true_value - self.mean_Z  # Mahalanobis distance
         d_M_squared = np.dot(np.dot(diff.T, self.precision_matrix), diff)  # d_M^2
-        within_elipse = d_M_squared <= self.critical
+        within_elipse = (d_M_squared <= chi2_critical)
+
         return within_elipse
+
+
+class Transformation(ABC):
+
+    @abstractmethod
+    def __call__(self, X):
+        ...
+
+    @abstractmethod
+    def inverse(self, X):
+        ...
+
+    def check(self, X, tol=1e-6):
+        T = self.__call__(X)
+        X_ = self.inverse(T)
+        return np.all(np.isclose(X, X_, rtol=tol))
+
+
+class CLR(Transformation):
+    """
+    Centered log-ratio
+    """
+    def __call__(self, X, epsilon=1e-6):
+        X = qp.error.smooth(X, epsilon)
+        G = np.exp(np.mean(np.log(X), axis=-1, keepdims=True))  # geometric mean
+        return np.log(X / G)
+
+    def inverse(self, X):
+        return softmax(X, axis=-1)
+
+
+class IdentityFunction(Transformation):
+    # f(X)=X
+    def __call__(self, X):
+        return X
+
+    def inverse(self, X):
+        return X
+
 
 class WithCIAbstract(ABC):
     @abstractmethod
     def quantify_ci(self, instances):
         ...
 
-# class WithCI(WithCIAbstract, BaseQuantifier):
-#
-#     def __init__(self, quantifier:BaseQuantifier, n_samples=100, sample_size=0.5, random_state=None):
-#         assert n_samples > 1, f'{n_samples=} must be > 1'
-#         assert (type(sample_size)==float and sample_size > 1) or (type(sample_size)==int and sample_size>1), \
-#             f'wrong value for {sample_size=}; specify a float (a proportion of the original size) or an integer'
-#         self.quantifier = quantifier
-#         self.n_samples = n_samples
-#         self.sample_size = sample_size
-#         self.random_state = random_state
-#
-#     def fit(self, data: LabelledCollection):
-#         return self.quantifier.fit(data)
-#
-#     def quantify(self, instances):
-#         prev_mean, self.prev_cov_last = self.quantify_ci(instances)
-#         return prev_mean
-#
-#     def quantify_ci(self, instances):
-#         prevs = []
-#         for i in range(self.n_samples):
-#             sample_i = resample(instances, n_samples=self.sample_size, random_state=self.random_state)
-#             prev_i = self.quantifier.quantify(sample_i)
-#             prevs.append(prev_i)
-#         prevs = np.asarray(prevs)
-#         prev_mean = prevs.mean(axis=0)
-#         prev_cov  = np.cov(prevs)
-#         return prev_mean, prev_cov
-
 
 class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
 
-    def __init__(self, quantifier: AggregativeQuantifier, n_samples=100, sample_size=1., confidence_level=0.95, random_state=None, df_red=False):
+    def __init__(self,
+                 quantifier: AggregativeQuantifier,
+                 n_samples=100,
+                 sample_size=1.,
+                 confidence_level=0.95,
+                 df_red=False,
+                 transform=None,
+                 random_state=None):
+
         assert n_samples > 1, f'{n_samples=} must be > 1'
         assert (type(sample_size) == float and sample_size > 0) or (type(sample_size) == int and sample_size > 1), \
             f'wrong value for {sample_size=}; specify a float (a proportion of the original size) or an integer'
+        assert transform in [None, 'clr'], 'unknown transformation'
         self.quantifier = quantifier
         self.n_samples = n_samples
         self.sample_size = sample_size
         self.confidence_level = confidence_level
-        self.random_state = random_state
         self.df_red = df_red
+        self.transform = transform
+        self.random_state = random_state
+
+    def _set_transformation(self):
+        if self.transform == 'clr':
+            self.transform_fn = CLR()
+            assert self.df_red==False, 'CLR removes the dependence of the last variable'
+        elif self.transform is None:
+            self.transform_fn = IdentityFunction()
+        else:
+            raise NotImplementedError(f'transformation {self.transform} not supported')
 
     def aggregation_fit(self, classif_predictions: LabelledCollection, data: LabelledCollection):
+        self._set_transformation()
         return self.quantifier.aggregation_fit(classif_predictions, data)
 
     def aggregate(self, classif_predictions: np.ndarray):
@@ -105,21 +162,15 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
             prev_i = self.quantifier.aggregate(sample_i)
             prevs.append(prev_i)
 
-        prevs = np.asarray(prevs)
-        mean = prevs.mean(axis=0)
-        cov = np.cov(prevs, rowvar=False, ddof=1)
+        constraints = 1 if self.df_red else 0
 
-        # critical chi-square value
-        n_classes = prevs.shape[1]  # number of variables is the number of classes
-        if self.df_red:
-            chi2_val = chi2.ppf(confidence_level, df=n_classes-1)  # prevs sum up to 1, so one degrees of freedom less
-        else:
-            chi2_val = chi2.ppf(confidence_level, df=n_classes)
+        conf_region = ConfidenceRegion(prevs, self.transform_fn, constraints=constraints, confidence_level=confidence_level)
+        prev_estim = conf_region.mean()
 
-        return ConfidenceRegion(mean, cov, chi2_val)
-
+        return prev_estim, conf_region
 
     def fit(self, data: LabelledCollection, fit_classifier=True, val_split=None):
+        self._set_transformation()
         return self.quantifier.fit(data, fit_classifier, val_split)
 
     def quantify_ci(self, instances, confidence_level=None):

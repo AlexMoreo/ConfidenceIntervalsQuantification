@@ -39,7 +39,7 @@ def show_results(result_path, tables, tables_path=f'./tables/{USE_PROTOCOL}/main
         'SLD-95-1-ddof-1': 'SLD-$|Te|$(-1)',
     }
 
-    Table.LatexPDF(tables_path, tables, method_replace=method_replace, verbose=True, clean=False, resizebox=False)
+    Table.LatexPDF(tables_path, tables, method_replace=method_replace, verbose=True, clean=True, resizebox=True)
 
 
 def collect_results(method_name, tables):

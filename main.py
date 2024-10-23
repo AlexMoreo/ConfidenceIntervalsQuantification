@@ -15,9 +15,6 @@ from pathlib import Path
 
 SEED = 1
 
-
-
-
 USE_PROTOCOL = 'upp'
 
 assert USE_PROTOCOL in ['upp', 'npp'], 'wrong protocol'
@@ -45,7 +42,8 @@ METHODS = [
     ('PACC-95', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=0.5), {}), # wrap_hyper(logreg_grid)),
     ('PACC-95-1', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1.), {}), # wrap_hyper(logreg_grid)),
     ('PACC-95-1-ddof-1', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., df_red=True), {}), # wrap_hyper(logreg_grid)),
-    ('PACC-95-1-ddof-1-optim', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., df_red=True), wrap_hyper(logreg_grid)), # wrap_hyper(logreg_grid)),
+    ('PACC-95-1-T', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., transform='clr'), {}), # wrap_hyper(logreg_grid)),
+    # ('PACC-95-1-ddof-1-optim', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., df_red=True), wrap_hyper(logreg_grid)), # wrap_hyper(logreg_grid)),
     # ('PACC-90', WithCIAgg(PACC(newLR()), confidence_level=0.90), {}), # wrap_hyper(logreg_grid)),
     # ('SLD-99', WithCIAgg(EMQ(newLR()), confidence_level=0.99), {}), # wrap_hyper(logreg_grid)),
     ('SLD-95', WithCIAgg(EMQ(newLR()), confidence_level=0.95, sample_size=0.5), {}), # wrap_hyper(logreg_grid)),
@@ -120,18 +118,18 @@ def job(args):
             protocol.on_preclassified_instances(pre_classifications, in_place=True)
             errs, success, = [], []
             for i, (sample, true_prev) in enumerate(protocol()):
-                confidence_region = quantifier.aggregate_ci(sample)
-                err_mae = qp.error.ae(true_prev, confidence_region.mean)
-                err_mrae = qp.error.rae(true_prev, confidence_region.mean)
+                pred_prev, confidence_region = quantifier.aggregate_ci(sample)
+                err_mae = qp.error.ae(true_prev, pred_prev)
+                err_mrae = qp.error.rae(true_prev, pred_prev)
                 is_within = confidence_region.within(true_prev)
 
                 series = {
                     'true-prev': true_prev,
-                    'estim-prev': confidence_region.mean,
+                    'estim-prev': pred_prev,
                     'mae': err_mae,
                     'mrae': err_mrae,
                     'within': is_within,
-                    'critical': confidence_region.critical,
+                    'critical': confidence_region.chi2_critical,
                 }
                 row_entries.append(series)
 

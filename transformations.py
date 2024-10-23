@@ -5,7 +5,7 @@ from scipy.special import softmax
 
 
 def clr_transform(x):
-    """Transformación log-ratio centrada (CLR) de una muestra del simplexo."""
+    """Transformation centered log-ratio (CLR)"""
     g = np.exp(np.mean(np.log(x), axis=-1, keepdims=True))  # Media geométrica
     return np.log(x / g)
 
