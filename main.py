@@ -42,7 +42,7 @@ METHODS = [
     ('PACC-95', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=0.5), {}), # wrap_hyper(logreg_grid)),
     ('PACC-95-1', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1.), {}), # wrap_hyper(logreg_grid)),
     ('PACC-95-1-ddof-1', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., df_red=True), {}), # wrap_hyper(logreg_grid)),
-    ('PACC-95-1-T', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., transform='clr'), {}), # wrap_hyper(logreg_grid)),
+    ('PACC-95-1-CLR', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., transform='clr'), {}), # wrap_hyper(logreg_grid)),
     # ('PACC-95-1-ddof-1-optim', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., df_red=True), wrap_hyper(logreg_grid)), # wrap_hyper(logreg_grid)),
     # ('PACC-90', WithCIAgg(PACC(newLR()), confidence_level=0.90), {}), # wrap_hyper(logreg_grid)),
     # ('SLD-99', WithCIAgg(EMQ(newLR()), confidence_level=0.99), {}), # wrap_hyper(logreg_grid)),

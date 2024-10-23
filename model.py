@@ -22,6 +22,7 @@ class ConfidenceRegion:
         X = np.asarray(X)
         Z = transformation(X)
 
+        self.mean_ = X.mean(axis=0)
         self.mean_Z = Z.mean(axis=0)
         self.cov_Z = np.cov(Z, rowvar=False, ddof=1)
 
@@ -39,7 +40,7 @@ class ConfidenceRegion:
 
     @functools.lru_cache
     def mean(self):
-        return self.transformation.inverse(self.mean_Z)
+        return self.mean_
 
     def within(self, true_value, confidence_level=None):
         """
