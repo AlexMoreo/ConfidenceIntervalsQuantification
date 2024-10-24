@@ -121,11 +121,12 @@ def simplex_volume(n):
 def simplex_proportion_covered(conf_region:ConfidenceRegion):
     simplex_dim = conf_region.xdim
     if isinstance(conf_region.transformation, IdentityFunction):
-        return conf_region.volume() / simplex_volume(simplex_dim)
+        proportion = conf_region.volume() / simplex_volume(simplex_dim)
     else:
         montecarlo_trials = 10_000
         uniform_simplex = F.uniform_simplex_sampling(n_classes=simplex_dim, size=montecarlo_trials)
-        return conf_region.within(uniform_simplex)
+        proportion = conf_region.within(uniform_simplex)
+    return min(proportion, 1.)
 
 
 class Transformation(ABC):
