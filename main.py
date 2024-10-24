@@ -63,14 +63,15 @@ def show_results(result_path):
     pd.set_option('display.width', 1000)  # Ajustar el ancho máximo
     pv = df.pivot_table(index='Dataset', columns="Method", values=["MAE"], margins=True)
     print(pv)
-    pv = df.pivot_table(index='Dataset', columns="Method", values=["MRAE"], margins=True)
-    print(pv)
+    # pv = df.pivot_table(index='Dataset', columns="Method", values=["MRAE"], margins=True)
+    # print(pv)
     pv = df.pivot_table(index='Dataset', columns="Method", values=["SUCCESS"], margins=True)
     print(pv)
-    pv = df.pivot_table(index='Dataset', columns="Method", values=["TR-TIME"], margins=True)
+    pv = df.pivot_table(index='Dataset', columns="Method", values=["PROPORTION"], margins=True)
     print(pv)
-    pv = df.pivot_table(index='Dataset', columns="Method", values=["TE-TIME"], margins=True)
-    print(pv)
+    # pv = df.pivot_table(index='Dataset', columns="Method", values=["TE-TIME"], margins=True)
+    # print(pv)
+
 
 
 def job(args):

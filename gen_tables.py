@@ -18,14 +18,14 @@ def show_results(result_path, tables, tables_path=f'./tables/{USE_PROTOCOL}/main
     pd.set_option('display.width', 1000)  # Ajustar el ancho máximo
     pv = df.pivot_table(index='Dataset', columns="Method", values=["MAE"], margins=True)
     print(pv)
-    pv = df.pivot_table(index='Dataset', columns="Method", values=["MRAE"], margins=True)
-    print(pv)
+    # pv = df.pivot_table(index='Dataset', columns="Method", values=["MRAE"], margins=True)
+    # print(pv)
     pv = df.pivot_table(index='Dataset', columns="Method", values=["SUCCESS"], margins=True)
     print(pv)
-    pv = df.pivot_table(index='Dataset', columns="Method", values=["TR-TIME"], margins=True)
+    pv = df.pivot_table(index='Dataset', columns="Method", values=["PROPORTION"], margins=True)
     print(pv)
-    pv = df.pivot_table(index='Dataset', columns="Method", values=["TE-TIME"], margins=True)
-    print(pv)
+    # pv = df.pivot_table(index='Dataset', columns="Method", values=["TE-TIME"], margins=True)
+    # print(pv)
 
     os.makedirs(Path(tables_path).parent, exist_ok=True)
     tables= [table for table in tables.values()]
@@ -59,9 +59,9 @@ def collect_results(method_name, tables):
                 for metric, table in tables.items():
                     tables[metric].add(benchmark=dataset, method=method_name, v=report[metric])
 
-            # means = report.mean(numeric_only=True)
-            # csv.write(f'{method_name}\t{dataset}\t{means["mae"]:.5f}\t{means["mrae"]:.5f}\t{means["within"]:.2f}\n')
-            # csv.flush()
+                means = report.mean(numeric_only=True)
+                csv.write(f'{method_name}\t{dataset}\t{means["mae"]:.5f}\t{means["mrae"]:.5f}\t{means["within"]:.2f}\t{means["proportion"]:.3f}\t{means["tr_time"]:.3f}\t{means["te_time"]:.3f}\n')
+                csv.flush()
 
 
 
@@ -92,7 +92,7 @@ if __name__ == '__main__':
 
     global_result_path = f'{result_dir}/allmethods'
     with open(global_result_path + '.csv', 'wt') as csv:
-        csv.write(f'Method\tDataset\tMAE\tMRAE\tSUCCESS\tTR-TIME\tTE-TIME\n')
+        csv.write(f'Method\tDataset\tMAE\tMRAE\tSUCCESS\tPROPORTION\tTR-TIME\tTE-TIME\n')
 
     for method_name, _, _ in METHODS:
         collect_results(method_name, tables)
