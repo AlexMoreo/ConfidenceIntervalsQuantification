@@ -88,10 +88,19 @@ class ConfidenceRegion:
         Returns:
         float: The volume of the ellipsoid.
         """
-        n = self.cov_Z.shape[0]  # Number of dimensions
+        def reduce_dimensions(cov, threshold=1e-7):
+            # some directions of the ellipse may be 0, we filter those out before computing the volume
+            eigenvalues, eigenvectors = np.linalg.eigh(cov)
+            # filter small directions
+            valid_idx = eigenvalues > threshold
+            filtered_cov = eigenvectors[:, valid_idx] @ np.diag(eigenvalues[valid_idx]) @ eigenvectors[:, valid_idx].T
+            return filtered_cov, eigenvalues[valid_idx]
 
         # Get the eigenvalues of the covariance matrix
-        eigenvalues, _ = np.linalg.eigh(self.cov_Z)
+        # eigenvalues, _ = np.linalg.eigh(self.cov_Z)
+
+        filtered_cov, eigenvalues = reduce_dimensions(self.cov_Z)
+        n = len(eigenvalues)  # Number of dimensions
 
         # Lengths of the semi-axes
         semi_axes = np.sqrt(eigenvalues * self.chi2_critical)
