@@ -4,7 +4,7 @@ import quapy as qp
 import quapy.functional as F
 from quapy.protocol import UPP, NPP
 from quapy.method.aggregative import PACC, EMQ, KDEyML
-from model import WithCIAgg
+from model import WithCIAgg, simplex_proportion_covered
 import pickle
 import os
 from time import time
@@ -39,16 +39,16 @@ def wrap_hyper(classifier_hyper_grid: dict):
 
 METHODS = [
     # ('PACC-99', WithCIAgg(PACC(newLR()), confidence_level=0.99), {}), # wrap_hyper(logreg_grid)),
-    ('PACC-95', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=0.5), {}), # wrap_hyper(logreg_grid)),
-    ('PACC-95-1', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1.), {}), # wrap_hyper(logreg_grid)),
-    ('PACC-95-1-ddof-1', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., df_red=True), {}), # wrap_hyper(logreg_grid)),
+    ('PACC-95-0.5-I', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=0.5), {}), # wrap_hyper(logreg_grid)),
+    ('PACC-95-1-I', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1.), {}), # wrap_hyper(logreg_grid)),
+    ('PACC-95-0.5-CLR', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=0.5, transform='clr'), {}), # wrap_hyper(logreg_grid)),
     ('PACC-95-1-CLR', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., transform='clr'), {}), # wrap_hyper(logreg_grid)),
     # ('PACC-95-1-ddof-1-optim', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., df_red=True), wrap_hyper(logreg_grid)), # wrap_hyper(logreg_grid)),
     # ('PACC-90', WithCIAgg(PACC(newLR()), confidence_level=0.90), {}), # wrap_hyper(logreg_grid)),
     # ('SLD-99', WithCIAgg(EMQ(newLR()), confidence_level=0.99), {}), # wrap_hyper(logreg_grid)),
-    ('SLD-95', WithCIAgg(EMQ(newLR()), confidence_level=0.95, sample_size=0.5), {}), # wrap_hyper(logreg_grid)),
-    ('SLD-95-1', WithCIAgg(EMQ(newLR()), confidence_level=0.95, sample_size=1.), {}), # wrap_hyper(logreg_grid)),
-    ('SLD-95-1-ddof-1', WithCIAgg(EMQ(newLR()), confidence_level=0.95, sample_size=1., df_red=True), {}), # wrap_hyper(logreg_grid)),
+    # ('SLD-95', WithCIAgg(EMQ(newLR()), confidence_level=0.95, sample_size=0.5), {}), # wrap_hyper(logreg_grid)),
+    # ('SLD-95-1', WithCIAgg(EMQ(newLR()), confidence_level=0.95, sample_size=1.), {}), # wrap_hyper(logreg_grid)),
+    # ('SLD-95-1-ddof-1', WithCIAgg(EMQ(newLR()), confidence_level=0.95, sample_size=1., df_red=True), {}), # wrap_hyper(logreg_grid)),
     # ('SLD-90', WithCIAgg(EMQ(newLR()), confidence_level=0.90), {}), # wrap_hyper(logreg_grid)),
     # ('KDEy',  KDEyML(newLR()), {**wrap_hyper(logreg_grid), **{'bandwidth': np.logspace(-4, np.log10(0.2), 20)}}),
 ]
@@ -116,12 +116,13 @@ def job(args):
             protocol = newProtocol(test, repeats=n_bags_test)
             pre_classifications = quantifier.classify(test.instances)
             protocol.on_preclassified_instances(pre_classifications, in_place=True)
-            errs, success, = [], []
+            errs, success, proportions = [], [], []
             for i, (sample, true_prev) in enumerate(protocol()):
                 pred_prev, confidence_region = quantifier.aggregate_ci(sample)
                 err_mae = qp.error.ae(true_prev, pred_prev)
                 err_mrae = qp.error.rae(true_prev, pred_prev)
                 is_within = confidence_region.within(true_prev)
+                proportion = simplex_proportion_covered(confidence_region)
 
                 series = {
                     'true-prev': true_prev,
@@ -130,13 +131,18 @@ def job(args):
                     'mrae': err_mrae,
                     'within': is_within,
                     'critical': confidence_region.chi2_critical,
+                    'proportion': proportion
                 }
                 row_entries.append(series)
 
                 errs.append(err_mae)
                 success.append(is_within * 1)
+                proportions.append(proportion)
 
-                print(f'[{(i + 1) / n_bags_test}] MAE={np.mean(errs):.4f} Success={np.mean(success):.2f}%')
+                print(f'[{(i + 1) / n_bags_test}] '
+                      f'MAE={np.mean(errs):.4f} '
+                      f'Success={100*np.mean(success):.2f}% '
+                      f'Proportion={100*np.mean(proportions):.3f}%')
 
             report = pd.DataFrame.from_records(row_entries)
 
@@ -157,7 +163,7 @@ def run_experiment(method_name, quantifier, param_grid):
 
         for report, dataset in zip(reports, datasets):
             means = report.mean(numeric_only=True)
-            csv.write(f'{method_name}\t{dataset}\t{means["mae"]:.5f}\t{means["mrae"]:.5f}\t{means["within"]:.2f}\t{means["tr_time"]:.3f}\t{means["te_time"]:.3f}\n')
+            csv.write(f'{method_name}\t{dataset}\t{means["mae"]:.5f}\t{means["mrae"]:.5f}\t{means["within"]:.2f}\t{means["proportion"]:.3f}\t{means["tr_time"]:.3f}\t{means["te_time"]:.3f}\n')
             csv.flush()
 
 
@@ -174,7 +180,7 @@ if __name__ == '__main__':
 
     global_result_path = f'{result_dir}/allmethods'
     with open(global_result_path + '.csv', 'wt') as csv:
-        csv.write(f'Method\tDataset\tMAE\tMRAE\tSUCCESS\tTR-TIME\tTE-TIME\n')
+        csv.write(f'Method\tDataset\tMAE\tMRAE\tSUCCESS\tPROPORTION\tTR-TIME\tTE-TIME\n')
 
     for method_name, quantifier, param_grid in METHODS:
         run_experiment(method_name, quantifier, param_grid)

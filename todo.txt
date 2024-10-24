@@ -1,0 +1,7 @@
+1.- comparar con intervalos de confianza independientes
+2.- bootstrap en training
+3.- bootstrap en training y en test
+4.- aumentar repeticiones en bootstrap a 500
+5.- probar en binario
+6.- calcular volumenes
+7.- calcular proporción del simplexo cubierto (Monte Carlo)

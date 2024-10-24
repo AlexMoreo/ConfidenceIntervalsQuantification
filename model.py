@@ -3,13 +3,15 @@ from functools import cache, cached_property
 
 import numpy as np
 import quapy as qp
+import quapy.functional as F
 from quapy.data import LabelledCollection
 from quapy.method.aggregative import AggregativeQuantifier
 from quapy.method.base import BaseQuantifier
 from scipy.stats import chi2
+from scipy.special import gamma
 from sklearn.utils import resample
 from abc import ABC, abstractmethod
-from scipy.special import softmax
+from scipy.special import softmax, factorial
 
 
 class ConfidenceRegion:
@@ -31,8 +33,9 @@ class ConfidenceRegion:
         except:
             self.precision_matrix = None
 
-        nfeats = Z.shape[1]
-        self.ddof = nfeats-constraints
+        self.xdim = X.shape[1]
+        self.zdim = Z.shape[1]
+        self.ddof = self.zdim - constraints
 
         # critical chi-square value
         self.confidence_level = confidence_level
@@ -44,7 +47,11 @@ class ConfidenceRegion:
 
     def within(self, true_value, confidence_level=None):
         """
+        true_value can be an array (n_dimensions,) or a matrix (n_vectors, n_dimensions,)
         confidence_level None means that the confidence_level is taken from the __init__
+        returns true or false depending on whether true_value is in the ellipse or not,
+            or returns the proportion of true_values that are within the ellipse if more
+            than one are passed
         """
         if (confidence_level is None) or (confidence_level==self.confidence_level):
             chi2_critical = self.chi2_critical
@@ -58,10 +65,58 @@ class ConfidenceRegion:
 
         # if X~N(mean, cov) then (X-mean).T cov^(-1) (X-mean) ~ chi2(df)
         diff = true_value - self.mean_Z  # Mahalanobis distance
-        d_M_squared = np.dot(np.dot(diff.T, self.precision_matrix), diff)  # d_M^2
+        # d_M_squared = np.dot(np.dot(diff.T, self.precision_matrix), diff)  # d_M^2
+        d_M_squared = diff @ self.precision_matrix @ diff.T  # d_M^2
+        if d_M_squared.ndim == 2:
+            d_M_squared = np.diag(d_M_squared)
+
         within_elipse = (d_M_squared <= chi2_critical)
 
+        if isinstance(within_elipse, np.ndarray):
+            within_elipse = np.mean(within_elipse)
+
         return within_elipse
+
+    def volume(self):
+        """
+        Calculates the volume of a confidence ellipsoid for a given covariance matrix.
+
+        Parameters:
+        cov_matrix (numpy.ndarray): The covariance matrix (n x n).
+        confidence_level (float): The desired confidence level (e.g., 0.95).
+
+        Returns:
+        float: The volume of the ellipsoid.
+        """
+        n = self.cov_Z.shape[0]  # Number of dimensions
+
+        # Get the eigenvalues of the covariance matrix
+        eigenvalues, _ = np.linalg.eigh(self.cov_Z)
+
+        # Lengths of the semi-axes
+        semi_axes = np.sqrt(eigenvalues * self.chi2_critical)
+
+        # Scaling factor for the volume in n dimensions
+        volume_factor = (np.pi ** (n / 2)) / gamma(n / 2 + 1)
+
+        # Calculate the volume of the ellipsoid
+        volume = volume_factor * np.prod(semi_axes)
+
+        return volume
+
+
+def simplex_volume(n):
+    return 1 / factorial(n)
+
+
+def simplex_proportion_covered(conf_region:ConfidenceRegion):
+    simplex_dim = conf_region.xdim
+    if isinstance(conf_region.transformation, IdentityFunction):
+        return conf_region.volume() / simplex_volume(simplex_dim)
+    else:
+        montecarlo_trials = 10_000
+        uniform_simplex = F.uniform_simplex_sampling(n_classes=simplex_dim, size=montecarlo_trials)
+        return conf_region.within(uniform_simplex)
 
 
 class Transformation(ABC):
@@ -115,7 +170,6 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
                  n_samples=100,
                  sample_size=1.,
                  confidence_level=0.95,
-                 df_red=False,
                  transform=None,
                  random_state=None):
 
@@ -127,16 +181,16 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
         self.n_samples = n_samples
         self.sample_size = sample_size
         self.confidence_level = confidence_level
-        self.df_red = df_red
         self.transform = transform
         self.random_state = random_state
 
     def _set_transformation(self):
         if self.transform == 'clr':
             self.transform_fn = CLR()
-            assert self.df_red==False, 'CLR removes the dependence of the last variable'
+            self.constraints = 0
         elif self.transform is None:
             self.transform_fn = IdentityFunction()
+            self.constraints = 1
         else:
             raise NotImplementedError(f'transformation {self.transform} not supported')
 
@@ -163,9 +217,7 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
             prev_i = self.quantifier.aggregate(sample_i)
             prevs.append(prev_i)
 
-        constraints = 1 if self.df_red else 0
-
-        conf_region = ConfidenceRegion(prevs, self.transform_fn, constraints=constraints, confidence_level=confidence_level)
+        conf_region = ConfidenceRegion(prevs, self.transform_fn, constraints=self.constraints, confidence_level=confidence_level)
         prev_estim = conf_region.mean()
 
         return prev_estim, conf_region
