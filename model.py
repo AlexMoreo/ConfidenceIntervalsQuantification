@@ -118,8 +118,7 @@ def simplex_volume(n):
     return 1 / factorial(n)
 
 
-def simplex_proportion_covered(conf_region:ConfidenceRegion):
-    simplex_dim = conf_region.xdim
+def simplex_proportion_covered(conf_region:ConfidenceRegion, simplex_dim):
     if isinstance(conf_region.transformation, IdentityFunction):
         proportion = conf_region.volume() / simplex_volume(simplex_dim)
     else:

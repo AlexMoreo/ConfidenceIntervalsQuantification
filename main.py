@@ -123,7 +123,7 @@ def job(args):
                 err_mae = qp.error.ae(true_prev, pred_prev)
                 err_mrae = qp.error.rae(true_prev, pred_prev)
                 is_within = confidence_region.within(true_prev)
-                proportion = simplex_proportion_covered(confidence_region)
+                proportion = simplex_proportion_covered(confidence_region, simplex_dim=(train.n_classes-1))
 
                 series = {
                     'true-prev': true_prev,
