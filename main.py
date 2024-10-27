@@ -39,8 +39,10 @@ def wrap_hyper(classifier_hyper_grid: dict):
 
 METHODS = [
     # ('PACC-99', WithCIAgg(PACC(newLR()), confidence_level=0.99), {}), # wrap_hyper(logreg_grid)),
-    ('PACC-95-0.5-I', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=0.5), {}), # wrap_hyper(logreg_grid)),
-    ('PACC-95-1-I', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1.), {}), # wrap_hyper(logreg_grid)),
+    # ('PACC-95-0.5-I', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=0.5, method='region'), {}), # wrap_hyper(logreg_grid)),
+    # ('PACC-95-1-I', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., method='region'), {}), # wrap_hyper(logreg_grid)),
+    ('PACC-95-0.5-I-int', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=0.5, method='intervals'), {}),  # wrap_hyper(logreg_grid)),
+    ('PACC-95-1-I-int', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., method='intervals'), {}),  # wrap_hyper(logreg_grid)),
     # ('PACC-95-0.5-CLR', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=0.5, transform='clr'), {}), # wrap_hyper(logreg_grid)),
     # ('PACC-95-1-CLR', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., transform='clr'), {}), # wrap_hyper(logreg_grid)),
     # ('PACC-95-1-ddof-1-optim', WithCIAgg(PACC(newLR()), confidence_level=0.95, sample_size=1., df_red=True), wrap_hyper(logreg_grid)), # wrap_hyper(logreg_grid)),
@@ -131,7 +133,7 @@ def job(args):
                     'mae': err_mae,
                     'mrae': err_mrae,
                     'within': is_within,
-                    'critical': confidence_region.chi2_critical,
+                    # 'critical': confidence_region.chi2_critical,
                     'proportion': proportion
                 }
                 row_entries.append(series)

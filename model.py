@@ -7,7 +7,7 @@ import quapy.functional as F
 from quapy.data import LabelledCollection
 from quapy.method.aggregative import AggregativeQuantifier
 from quapy.method.base import BaseQuantifier
-from scipy.stats import chi2
+from scipy.stats import chi2, sem, t
 from scipy.special import gamma
 from sklearn.utils import resample
 from abc import ABC, abstractmethod
@@ -41,7 +41,6 @@ class ConfidenceRegion:
         self.confidence_level = confidence_level
         self.chi2_critical = chi2.ppf(confidence_level, df=self.ddof)
 
-    @functools.lru_cache
     def mean(self):
         return self.mean_
 
@@ -114,17 +113,69 @@ class ConfidenceRegion:
         return volume
 
 
+class ConfidenceIntervals:
+
+    def __init__(self, X, confidence_level=0.95):
+        assert 0 < confidence_level < 1, f'{confidence_level=} must be in range(0,1)'
+
+        X = np.asarray(X)
+
+        self.means = X.mean(axis=0)
+        self.sem = sem(X, axis=0, ddof=1)
+        self.nd = X.shape[1]
+
+        h = t.ppf((1 + confidence_level) / 2., self.nd - 1) * self.sem
+        self.conf_intervals_low = np.clip(self.means-h, a_min=0., a_max=1.)
+        self.conf_intervals_high = np.clip(self.means+h, a_min=0., a_max=1.)
+
+    def mean(self):
+        return self.means
+
+    def within(self, true_value, confidence_level=None):
+        """
+        true_value can be an array (n_dimensions,) or a matrix (n_vectors, n_dimensions,)
+        confidence_level None means that the confidence_level is taken from the __init__
+        returns true or false depending on whether true_value is in the ellipse or not,
+            or returns the proportion of true_values that are within the ellipse if more
+            than one are passed
+        """
+        if (confidence_level is None) or (confidence_level==self.confidence_level):
+            I_low = self.conf_intervals_low
+            I_high = self.conf_intervals_high
+        else:
+            h = t.ppf((1 + confidence_level) / 2., self.nd - 1) * self.sem
+            I_low = np.clip(self.means - h, a_min=0., a_max=1.)
+            I_high = np.clip(self.means + h, a_min=0., a_max=1.)
+
+        within_intervals = np.logical_and(I_low < true_value, true_value < I_high)
+        within_all_intervals = np.all(within_intervals, axis=-1, keepdims=True)
+        proportion = within_all_intervals.mean()
+
+        return proportion
+
+    def volume(self):
+        """
+        Calculates the volume of the cube
+
+        Returns:
+        float: The volume of the cube
+        """
+        amp = self.conf_intervals_high - self.conf_intervals_low
+        volume = np.prod(amp)
+        return float(volume)
+
+
 def simplex_volume(n):
     return 1 / factorial(n)
 
 
-def simplex_proportion_covered(conf_region:ConfidenceRegion, simplex_dim):
-    if isinstance(conf_region.transformation, IdentityFunction):
-        proportion = conf_region.volume() / simplex_volume(simplex_dim)
-    else:
+def simplex_proportion_covered(conf:[ConfidenceRegion,ConfidenceIntervals], simplex_dim):
+    if isinstance(conf, ConfidenceRegion) and not isinstance(conf.transformation, IdentityFunction):
         montecarlo_trials = 10_000
         uniform_simplex = F.uniform_simplex_sampling(n_classes=simplex_dim, size=montecarlo_trials)
-        proportion = conf_region.within(uniform_simplex)
+        proportion = conf.within(uniform_simplex)
+    else:
+        proportion = conf.volume() / simplex_volume(simplex_dim)
     return min(proportion, 1.)
 
 
@@ -174,23 +225,29 @@ class WithCIAbstract(ABC):
 
 class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
 
+    METHODS = ['intervals', 'region']
+
     def __init__(self,
                  quantifier: AggregativeQuantifier,
                  n_samples=100,
                  sample_size=1.,
                  confidence_level=0.95,
                  transform=None,
+                 method='intervals',
                  random_state=None):
 
         assert n_samples > 1, f'{n_samples=} must be > 1'
         assert (type(sample_size) == float and sample_size > 0) or (type(sample_size) == int and sample_size > 1), \
             f'wrong value for {sample_size=}; specify a float (a proportion of the original size) or an integer'
         assert transform in [None, 'clr'], 'unknown transformation'
+        assert method in self.METHODS, f'unknown method; valid ones are {self.METHODS}'
+        assert method == 'intervals' or transform is None, f'invalid combination of {method=} and {transform=}'
         self.quantifier = quantifier
         self.n_samples = n_samples
         self.sample_size = sample_size
         self.confidence_level = confidence_level
         self.transform = transform
+        self.method = method
         self.random_state = random_state
 
     def _set_transformation(self):
@@ -226,10 +283,14 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
             prev_i = self.quantifier.aggregate(sample_i)
             prevs.append(prev_i)
 
-        conf_region = ConfidenceRegion(prevs, self.transform_fn, constraints=self.constraints, confidence_level=confidence_level)
-        prev_estim = conf_region.mean()
+        if self.method == 'region':
+            conf = ConfidenceRegion(prevs, self.transform_fn, constraints=self.constraints, confidence_level=confidence_level)
+        elif self.method == 'intervals':
+            conf = ConfidenceIntervals(prevs, confidence_level=confidence_level)
 
-        return prev_estim, conf_region
+        prev_estim = conf.mean()
+
+        return prev_estim, conf
 
     def fit(self, data: LabelledCollection, fit_classifier=True, val_split=None):
         self._set_transformation()
