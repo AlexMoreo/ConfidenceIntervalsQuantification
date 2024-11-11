@@ -5,11 +5,10 @@ import quapy.functional as F
 from quapy.protocol import UPP, NPP
 from commons import *
 from gen_tables import show_results
-from model import WithCIAgg, simplex_proportion_covered
+from model import WithCIAgg
 import pickle
 import os
 from time import time
-from quapy.model_selection import GridSearchQ
 from pathlib import Path
 
 
@@ -19,7 +18,7 @@ newProtocol = UPP if USE_PROTOCOL=='upp' else NPP
 
 
 def job(args):
-    dataset, method_name, quantifier, param_grid, global_result_path = args
+    dataset, method_name, quantifier, global_result_path = args
     print('init', dataset)
 
     local_result_path = os.path.join(Path(global_result_path).parent, method_name + '_' + dataset + '.dataframe')
@@ -37,7 +36,7 @@ def job(args):
             if dataset in BINARY_DATASETS:
                 loader = qp.datasets.fetch_UCIBinaryDataset
             elif dataset in MULTICLASS_DATASETS:
-                qp.datasets.fetch_UCIMulticlassDataset
+                loader = qp.datasets.fetch_UCIMulticlassDataset
 
             try:                
                 data = loader(dataset, verbose=True)
@@ -56,32 +55,13 @@ def job(args):
 
             # training
             # ------------
-            if len(param_grid) == 0:
-                t_init = time()
-                quantifier.fit(train)
-                train_time = time() - t_init
-            else:
-                # model selection (train)
-                train, val = train.split_stratified(random_state=SEED)
-                protocol = newProtocol(val, repeats=N_BAGS_VAL)
-                modsel = GridSearchQ(
-                    quantifier, param_grid, protocol, refit=True, n_jobs=N_JOBS, verbose=1, error='mae'
-                )
-                t_init = time()
-                try:
-                    modsel.fit(train)
-                    print(f'best params {modsel.best_params_}')
-                    print(f'best score {modsel.best_score_}')
-                    quantifier = modsel.best_model()
-                except:
-                    print('something went wrong... trying to fit the default model')
-                    quantifier.fit(train)
-                train_time = time() - t_init
+            t_init = time()
+            quantifier.fit(train)
+            train_time = time() - t_init
 
             # test
             # ------------
             t_init = time()
-
             row_entries = []
             protocol = newProtocol(test, repeats=N_BAGS_TEST)
             pre_classifications = quantifier.classify(test.instances)
@@ -92,7 +72,7 @@ def job(args):
                 err_mae = qp.error.ae(true_prev, pred_prev)
                 err_mrae = qp.error.rae(true_prev, pred_prev)
                 is_within = confidence_region.within(true_prev)
-                proportion = simplex_proportion_covered(confidence_region, simplex_dim=(train.n_classes-1))
+                proportion = confidence_region.simplex_portion()
 
                 series = {
                     'true-prev': true_prev,
@@ -115,7 +95,6 @@ def job(args):
                 
             # prepare report
             # --------------
-
             report = pd.DataFrame.from_records(row_entries)
 
             test_time = time() - t_init
@@ -134,10 +113,10 @@ def run_experiments(result_dir):
     with open(global_result_path, 'wt') as csv:
         csv.write(f'Method\tDataset\tMAE\tMRAE\tSUCCESS\tPROPORTION\tTR-TIME\tTE-TIME\n')
 
-        for method_name, quantifier, param_grid in METHODS:        
+        for method_name, quantifier in METHODS:        
             reports = qp.util.parallel(
                 job, 
-                [(dataset, method_name, quantifier, param_grid, global_result_path) for dataset in DATASETS], 
+                [(dataset, method_name, quantifier, global_result_path) for dataset in DATASETS], 
                 n_jobs=N_JOBS, 
                 asarray=False
             )
@@ -157,8 +136,8 @@ if __name__ == '__main__':
     qp.environ['N_JOBS'] = N_JOBS
 
     for DATASETS, folder in [
+            (MULTICLASS_DATASETS, 'ucimulti'),
             (BINARY_DATASETS, 'binary'), 
-            (MULTICLASS_DATASETS, 'ucimulti')
         ]:
         result_dir = f'results/{folder}/{USE_PROTOCOL}'        
         global_result_path = run_experiments(result_dir)

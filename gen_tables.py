@@ -47,7 +47,7 @@ def collect_results(result_dir, tables):
     with open(global_result_path, 'wt') as csv:
         csv.write(f'Method\tDataset\tMAE\tMRAE\tSUCCESS\tPROPORTION\tTR-TIME\tTE-TIME\n')
 
-        for method_name, _, _ in METHODS:        
+        for method_name, _ in METHODS:        
             for dataset in DATASETS:
                 print('init', dataset)
 
