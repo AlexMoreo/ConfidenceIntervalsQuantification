@@ -91,9 +91,12 @@ def job(args):
 
                     errs.append(err_mae)
                 else:
+                    t_init = time()
                     pred_prev = quantifier.aggregate(sample)
                     err_mae = qp.error.ae(true_prev, pred_prev)
                     err_mrae = qp.error.rae(true_prev, pred_prev)
+                    te_time_increment = time() - t_init
+                    te_time += te_time_increment
 
                     series = {
                         'true-prev': true_prev,
