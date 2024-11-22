@@ -32,8 +32,7 @@ def job(args):
         print('Init: ', local_result_path)
         with qp.util.temp_seed(SEED):
 
-            # load dataset
-            # ------------
+            # load dataset            # ------------
             if dataset in BINARY_DATASETS:
                 loader = qp.datasets.fetch_UCIBinaryDataset
             elif dataset in MULTICLASS_DATASETS:
@@ -64,7 +63,7 @@ def job(args):
             # ------------
             te_time = 0
             row_entries = []
-            protocol = newProtocol(test, repeats=N_BAGS_TEST)
+            protocol = newProtocol(test, repeats=N_BAGS_TEST_FAKE)
             t_init = time()
             pre_classifications = quantifier.classify(test.instances)
             te_time_increment = time()-t_init
@@ -72,7 +71,7 @@ def job(args):
 
             protocol.on_preclassified_instances(pre_classifications, in_place=True)
             errs = []
-            pbar = tqdm(protocol(), total=N_BAGS_TEST)
+            pbar = tqdm(protocol(), total=N_BAGS_TEST_FAKE)
             for i, (sample, true_prev) in enumerate(pbar):
                 if isinstance(quantifier, WithCIAgg):
                     t_init=time()
@@ -112,7 +111,7 @@ def job(args):
             # --------------
             report = pd.DataFrame.from_records(row_entries)
 
-            test_time = te_time / N_BAGS_TEST
+            test_time = te_time / N_BAGS_TEST_FAKE
             report['tr_time'] = train_time
             report['te_time'] = test_time
             report.to_csv(local_result_path)
@@ -140,8 +139,10 @@ if __name__ == '__main__':
     qp.environ['SAMPLE_SIZE'] = SAMPLE_SIZE
     qp.environ['N_JOBS'] = N_JOBS
 
+    N_BAGS_TEST_FAKE = 10
+
     for DATASETS, folder in [
-            # (MULTICLASS_DATASETS, 'ucimulti'),
+            (MULTICLASS_DATASETS, 'ucimulti'),
             (BINARY_DATASETS, 'binary'),
         ]:
         result_dir = f'results_fake/{folder}/{USE_PROTOCOL}'
