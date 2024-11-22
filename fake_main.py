@@ -10,6 +10,7 @@ import pickle
 import os
 from time import time
 from pathlib import Path
+from tqdm import tqdm
 
 
 assert USE_PROTOCOL in ['upp', 'npp'], 'wrong protocol'
@@ -70,8 +71,9 @@ def job(args):
             te_time += te_time_increment
 
             protocol.on_preclassified_instances(pre_classifications, in_place=True)
-            errs, success, proportions = [], [], []
-            for i, (sample, true_prev) in enumerate(protocol()):
+            errs = []
+            pbar = tqdm(protocol(), total=N_BAGS_TEST)
+            for i, (sample, true_prev) in enumerate(pbar):
                 if isinstance(quantifier, WithCIAgg):
                     t_init=time()
                     pred_prev, confidence_region = quantifier.aggregate_ci(sample)
@@ -104,6 +106,8 @@ def job(args):
 
                     errs.append(err_mae)
 
+                pbar.set_description(f'{train_time=:.4f}\t{te_time=:.4f}')
+
             # prepare report
             # --------------
             report = pd.DataFrame.from_records(row_entries)
@@ -120,27 +124,14 @@ def run_experiments(result_dir):
 
     os.makedirs(result_dir, exist_ok=True)
     
-    global_result_path = f'{result_dir}/allmethods.csv'
-    with open(global_result_path, 'wt') as csv:
-        csv.write(f'Method\tDataset\tMAE\tMRAE\tSUCCESS\tPROPORTION\tTR-TIME\tTE-TIME\n')
+    for method_name, quantifier in METHODS:
+        reports = qp.util.parallel(
+            job,
+            [(dataset, method_name, quantifier, global_result_path) for dataset in DATASETS],
+            n_jobs=N_JOBS,
+            asarray=False
+        )
 
-        for method_name, quantifier in METHODS:        
-            reports = qp.util.parallel(
-                job, 
-                [(dataset, method_name, quantifier, global_result_path) for dataset in DATASETS], 
-                n_jobs=N_JOBS, 
-                asarray=False
-            )
-
-            for report, dataset in zip(reports, DATASETS):
-                means = report.mean(numeric_only=True)
-                if isinstance(quantifier, WithCIAgg):
-                    csv.write(f'{method_name}\t{dataset}\t{means["mae"]:.5f}\t{means["mrae"]:.5f}\t{means["within"]:.2f}\t{means["proportion"]:.3f}\t{means["tr_time"]:.3f}\t{means["te_time"]:.3f}\n')
-                else:
-                    csv.write(f'{method_name}\t{dataset}\t{means["mae"]:.5f}\t{means["mrae"]:.5f}\t{-1}\t{-1}\t{means["tr_time"]:.3f}\t{means["te_time"]:.3f}\n')
-                csv.flush()
-
-    return global_result_path
 
 
 
@@ -154,6 +145,5 @@ if __name__ == '__main__':
             (BINARY_DATASETS, 'binary'),
         ]:
         result_dir = f'results_fake/{folder}/{USE_PROTOCOL}'
-        global_result_path = run_experiments(result_dir)
-        show_results(global_result_path)
+        run_experiments(result_dir)
 

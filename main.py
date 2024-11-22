@@ -10,7 +10,6 @@ import pickle
 import os
 from time import time
 from pathlib import Path
-from tqdm import tqdm
 
 
 assert USE_PROTOCOL in ['upp', 'npp'], 'wrong protocol'
@@ -68,8 +67,7 @@ def job(args):
             pre_classifications = quantifier.classify(test.instances)
             protocol.on_preclassified_instances(pre_classifications, in_place=True)
             errs, success, proportions = [], [], []
-            pbar = tqdm(protocol, total=N_BAGS_TEST)
-            for i, (sample, true_prev) in enumerate(pbar):
+            for i, (sample, true_prev) in enumerate(protocol()):
                 if isinstance(quantifier, WithCIAgg):
                     pred_prev, confidence_region = quantifier.aggregate_ci(sample)
                     err_mae = qp.error.ae(true_prev, pred_prev)
