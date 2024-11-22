@@ -19,10 +19,10 @@ newProtocol = UPP if USE_PROTOCOL=='upp' else NPP
 
 
 def job(args):
-    dataset, method_name, quantifier, global_result_path = args
+    dataset, method_name, quantifier, result_dir = args
     print('init', dataset)
 
-    local_result_path = os.path.join(Path(global_result_path).parent, method_name + '_' + dataset + '.dataframe')
+    local_result_path = os.path.join(result_dir, method_name + '_' + dataset + '.dataframe')
     if os.path.exists(local_result_path):
         # if the file already exists, returns it
         print(f'result file {local_result_path} already exist; skipping')
@@ -127,7 +127,7 @@ def run_experiments(result_dir):
     for method_name, quantifier in METHODS:
         reports = qp.util.parallel(
             job,
-            [(dataset, method_name, quantifier, global_result_path) for dataset in DATASETS],
+            [(dataset, method_name, quantifier, result_dir) for dataset in DATASETS],
             n_jobs=N_JOBS,
             asarray=False
         )
