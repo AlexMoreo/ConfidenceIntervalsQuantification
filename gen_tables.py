@@ -29,16 +29,27 @@ def gen_pdf_tables(tables, tables_path):
     os.makedirs(Path(tables_path).parent, exist_ok=True)
     tables= [table for table in tables.values()]
 
-    method_replace = {
-        'PACC-95': 'PACC-$\\frac{|Te|}{2}$',
-        'PACC-95-1': 'PACC-$|Te|$',
-        'PACC-95-1-ddof-1': 'PACC-$|Te|$(-1)',
-        'SLD-95': 'SLD-$\\frac{|Te|}{2}$',
-        'SLD-95-1': 'SLD-$|Te|$',
-        'SLD-95-1-ddof-1': 'SLD-$|Te|$(-1)',
-    }
+    method_replace = {}
+    for q_name in ['ACC', 'PACC', 'DM', 'SLD']:
+        for bootstrap in ['tr1-te500', 'tr500-te1', 'tr100-te100']:
+            bootstrap_rep_dict = {
+                'tr1-te500': 'P',
+                'tr500-te1': 'M',
+                'tr100-te100': 'B'
+            }
+            bootstrap_rep = bootstrap_rep_dict[bootstrap]
+            for region in ['region', 'clr', 'intervals']:
+                region = region[:3].title()
+                region_rep_dict = {
+                    'mReg': 'CE',
+                    'mClr': 'CT',
+                    'mInt': 'CI'
+                }
+                region_rep = region_rep_dict['m'+region]
+                method_replace[f'{q_name}-95-{bootstrap}-m{region}'] = f'{q_name}-{bootstrap_rep}-{region_rep}'
+                method_replace[f'{q_name}-{bootstrap}-m{region}'] = f'{q_name}-{bootstrap_rep}-{region_rep}'
 
-    Table.LatexPDF(tables_path, tables, method_replace=method_replace, verbose=False, clean=True, resizebox=True)
+    Table.LatexPDF(tables_path, tables, method_replace=method_replace, verbose=False, clean=False, resizebox=True)
 
 
 def collect_results(result_dir, tables):
@@ -90,15 +101,24 @@ if __name__ == '__main__':
             'harmonicconf': Table('harmonicconf')
         }
 
-        # tables['mae'].format.stat_test = None
+        tables['mae'].format.show_std = False
+        tables['mae'].format.remove_zero = True
+
         tables['within'].format.show_std = False
         tables['within'].format.mean_prec = 2
         tables['within'].format.stat_test = None
         tables['within'].format.lower_is_better = False
-        tables['harmonicconf'].format.lower_is_better = False
+        tables['within'].format.remove_zero = True
+
+        tables['proportion'].format.show_std = False
+        tables['proportion'].format.mean_prec = 2
+        tables['proportion'].format.stat_test = None
+        tables['proportion'].format.lower_is_better = True
+        tables['proportion'].format.remove_zero = True
+        # tables['harmonicconf'].format.lower_is_better = False
         # tables['critical'].format.show_std = False
 
         global_result_path = collect_results(result_dir, tables)
 
         show_results(global_result_path)
-        gen_pdf_tables(tables, tables_path=f'./tables/{folder}/{USE_PROTOCOL}/main.pdf')
+        gen_pdf_tables(tables, tables_path=f'./tables/{folder}/{USE_PROTOCOL}/dm.pdf')

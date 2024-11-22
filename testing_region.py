@@ -2,7 +2,10 @@ import quapy as qp
 import quapy.functional as F
 from scipy.stats import dirichlet, chi2
 import numpy as np
-from model import ConfidenceRegion, IdentityFunction
+
+from model_depr import ConfidenceRegion, IdentityFunction
+
+# from model import ConfidenceRegion, IdentityFunction
 
 
 #points = F.uniform_simplex_sampling(n_classes=3, size=5)

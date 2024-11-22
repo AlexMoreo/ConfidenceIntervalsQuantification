@@ -1,7 +1,5 @@
-1.- comparar con intervalos de confianza independientes
-2.- bootstrap en training
-3.- bootstrap en training y en test
-4.- aumentar repeticiones en bootstrap a 500
-5.- probar en binario
-6.- calcular volumenes
-7.- calcular proporción del simplexo cubierto (Monte Carlo)
+1.- Hacer plots en datasets de 3 n_classes, con puntos, valor real, y elipse
+2.- Ver una gráfica de success vs amount of shift
+3.- Ver una gráfica de proportion vs amount of shift
+4.- Tal vez una única gráfica que combine 2 y 3
+5.- Comparar con otros baselines

@@ -68,25 +68,40 @@ def job(args):
             protocol.on_preclassified_instances(pre_classifications, in_place=True)
             errs, success, proportions = [], [], []
             for i, (sample, true_prev) in enumerate(protocol()):
-                pred_prev, confidence_region = quantifier.aggregate_ci(sample)
-                err_mae = qp.error.ae(true_prev, pred_prev)
-                err_mrae = qp.error.rae(true_prev, pred_prev)
-                is_within = confidence_region.within(true_prev)
-                proportion = confidence_region.simplex_portion()
+                if isinstance(quantifier, WithCIAgg):
+                    pred_prev, confidence_region = quantifier.aggregate_ci(sample)
+                    err_mae = qp.error.ae(true_prev, pred_prev)
+                    err_mrae = qp.error.rae(true_prev, pred_prev)
+                    is_within = confidence_region.within(true_prev)
+                    proportion = confidence_region.simplex_portion()
 
-                series = {
-                    'true-prev': true_prev,
-                    'estim-prev': pred_prev,
-                    'mae': err_mae,
-                    'mrae': err_mrae,
-                    'within': is_within,
-                    'proportion': proportion
-                }
-                row_entries.append(series)
+                    series = {
+                        'true-prev': true_prev,
+                        'estim-prev': pred_prev,
+                        'mae': err_mae,
+                        'mrae': err_mrae,
+                        'within': is_within,
+                        'proportion': proportion
+                    }
+                    row_entries.append(series)
 
-                errs.append(err_mae)
-                success.append(is_within * 1)
-                proportions.append(proportion)
+                    errs.append(err_mae)
+                    success.append(is_within * 1)
+                    proportions.append(proportion)
+                else:
+                    pred_prev = quantifier.aggregate(sample)
+                    err_mae = qp.error.ae(true_prev, pred_prev)
+                    err_mrae = qp.error.rae(true_prev, pred_prev)
+
+                    series = {
+                        'true-prev': true_prev,
+                        'estim-prev': pred_prev,
+                        'mae': err_mae,
+                        'mrae': err_mrae,
+                    }
+                    row_entries.append(series)
+
+                    errs.append(err_mae)
 
                 print(f'[{(i + 1) / protocol.total()}] '
                       f'MAE={np.mean(errs):.4f} '
@@ -123,7 +138,10 @@ def run_experiments(result_dir):
 
             for report, dataset in zip(reports, DATASETS):
                 means = report.mean(numeric_only=True)
-                csv.write(f'{method_name}\t{dataset}\t{means["mae"]:.5f}\t{means["mrae"]:.5f}\t{means["within"]:.2f}\t{means["proportion"]:.3f}\t{means["tr_time"]:.3f}\t{means["te_time"]:.3f}\n')
+                if isinstance(quantifier, WithCIAgg):
+                    csv.write(f'{method_name}\t{dataset}\t{means["mae"]:.5f}\t{means["mrae"]:.5f}\t{means["within"]:.2f}\t{means["proportion"]:.3f}\t{means["tr_time"]:.3f}\t{means["te_time"]:.3f}\n')
+                else:
+                    csv.write(f'{method_name}\t{dataset}\t{means["mae"]:.5f}\t{means["mrae"]:.5f}\t{-1}\t{-1}\t{means["tr_time"]:.3f}\t{means["te_time"]:.3f}\n')
                 csv.flush()
 
     return global_result_path
@@ -137,7 +155,7 @@ if __name__ == '__main__':
 
     for DATASETS, folder in [
             (MULTICLASS_DATASETS, 'ucimulti'),
-            (BINARY_DATASETS, 'binary'), 
+            # (BINARY_DATASETS, 'binary'),
         ]:
         result_dir = f'results/{folder}/{USE_PROTOCOL}'        
         global_result_path = run_experiments(result_dir)

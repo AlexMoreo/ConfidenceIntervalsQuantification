@@ -62,20 +62,24 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
 
     def aggregation_fit(self, classif_predictions: LabelledCollection, data: LabelledCollection):
         if type(self.sample_size)==float:
-            n_samples = int(len(classif_predictions) * self.sample_size)
+            n_samples = int(len(data) * self.sample_size)
         else:
             n_samples = self.sample_size
 
         self.quantifiers = []
-        full_index = np.arange(len(data))
-        with qp.util.temp_seed(self.random_state):
-            for i in range(self.n_train_samples):
-                quantifier = copy.deepcopy(self.quantifier)
-                index = resample(full_index, n_samples=n_samples)
-                classif_predictions_i = classif_predictions.sampling_from_index(index)
-                data_i = data.sampling_from_index(index)
-                quantifier.aggregation_fit(classif_predictions_i, data_i)
-                self.quantifiers.append(quantifier)
+        if self.n_train_samples==1:
+            self.quantifier.aggregation_fit(classif_predictions, data)
+            self.quantifiers.append(self.quantifier)
+        else:
+            full_index = np.arange(len(data))
+            with qp.util.temp_seed(self.random_state):
+                for i in range(self.n_train_samples):
+                    quantifier = copy.deepcopy(self.quantifier)
+                    index = resample(full_index, n_samples=n_samples)
+                    classif_predictions_i = classif_predictions.sampling_from_index(index)
+                    data_i = data.sampling_from_index(index)
+                    quantifier.aggregation_fit(classif_predictions_i, data_i)
+                    self.quantifiers.append(quantifier)
         return self
 
     def aggregate(self, classif_predictions: np.ndarray):
