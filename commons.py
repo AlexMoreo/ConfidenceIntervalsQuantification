@@ -23,10 +23,10 @@ def newLR():
 
 QUANTIFIERS = [
         #(CC, 'CC'),
-        (ACC, 'ACC'),
+        # (ACC, 'ACC'),
         # (PCC, 'PCC'),
         (PACC, 'PACC'),
-        (DistributionMatchingY, 'DM'),
+        # (DistributionMatchingY, 'DM'),
         # (EMQ, 'SLD')
     ]
 

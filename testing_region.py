@@ -3,7 +3,7 @@ import quapy.functional as F
 from scipy.stats import dirichlet, chi2
 import numpy as np
 
-from model_depr import ConfidenceRegion, IdentityFunction
+from confidence import ConfidenceRegionSimplex
 
 # from model import ConfidenceRegion, IdentityFunction
 
@@ -16,13 +16,8 @@ alphas = [8,1,10]
 points = dirichlet.rvs(alpha=alphas[:simplex_dim+1], size=num_points, random_state=0)
 print(points)
 
-cr = ConfidenceRegion(points, transformation=IdentityFunction(), constraints=1)
+cr = ConfidenceRegionSimplex(points)
 
-print(cr.dimensions)
-
-print(cr.volume())
-
-print(f'{cr.mean()=}')
 
 # checks whether all points in the surface of the ellipse are contained in the probability simplex
 num_samples=100
@@ -40,7 +35,7 @@ axes = cr.semiaxes
 print('axes')
 print(axes)
 #_, eigenvalues, eigenvectors = cr.reduced_cov()
-eigenvalues, eigenvectors = np.linalg.eigh(cr.cov_Z)
+eigenvalues, eigenvectors = np.linalg.eigh(cr.cov)
 small_eigenvalues = eigenvalues < 1e-7
 eigenvalues[small_eigenvalues]=0
 chi2_critical = chi2.ppf(0.95, df=simplex_dim)
@@ -63,7 +58,7 @@ print('elipsoidal points')
 print(ellipsoidal_points)
 
 # traslate to mean
-ellipsoidal_points += cr.mean_Z
+ellipsoidal_points += cr.mean()
 print('elipsoidal points traslated')
 print(ellipsoidal_points)
 
@@ -121,21 +116,21 @@ z_plane[z_plane < 0] = np.nan  # Esto hará que esos puntos no se dibujen
 ax.plot_surface(x_grid, y_grid, z_plane, alpha=0.5, color='orange', edgecolor='none')
 
 # Etiquetas de los ejes
-ax.set_xlabel('X Label')
-ax.set_ylabel('Y Label')
-ax.set_zlabel('Z Label')
+# ax.set_xlabel('X Label')
+# ax.set_ylabel('Y Label')
+# ax.set_zlabel('Z Label')
 
 ax.set_xlim(0, 1)
 ax.set_ylim(0, 1)
 ax.set_zlim(0, 1)
 
 # Título
-ax.set_title('3D Point Representation')
+# ax.set_title('3D Point Representation')
 
 ax.view_init(elev=10, azim=20)
 
-# Mostrar la gráfica
-plt.savefig('ellipse.png')
+plt.savefig('ellipse_out.pdf', bbox_inches='tight')
+print('done')
 
 
 

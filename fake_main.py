@@ -10,7 +10,6 @@ import pickle
 import os
 from time import time
 from pathlib import Path
-from tqdm import tqdm
 
 
 assert USE_PROTOCOL in ['upp', 'npp'], 'wrong protocol'
@@ -62,34 +61,34 @@ def job(args):
 
             # test
             # ------------
-            t_init = time()
+            te_time = 0
             row_entries = []
             protocol = newProtocol(test, repeats=N_BAGS_TEST)
+            t_init = time()
             pre_classifications = quantifier.classify(test.instances)
+            te_time_increment = time()-t_init
+            te_time += te_time_increment
+
             protocol.on_preclassified_instances(pre_classifications, in_place=True)
             errs, success, proportions = [], [], []
-            pbar = tqdm(protocol, total=N_BAGS_TEST)
-            for i, (sample, true_prev) in enumerate(pbar):
+            for i, (sample, true_prev) in enumerate(protocol()):
                 if isinstance(quantifier, WithCIAgg):
+                    t_init=time()
                     pred_prev, confidence_region = quantifier.aggregate_ci(sample)
                     err_mae = qp.error.ae(true_prev, pred_prev)
                     err_mrae = qp.error.rae(true_prev, pred_prev)
-                    is_within = confidence_region.within(true_prev)
-                    proportion = confidence_region.simplex_portion()
+                    te_time_increment = time() - t_init
+                    te_time += te_time_increment
 
                     series = {
                         'true-prev': true_prev,
                         'estim-prev': pred_prev,
                         'mae': err_mae,
                         'mrae': err_mrae,
-                        'within': is_within,
-                        'proportion': proportion
                     }
                     row_entries.append(series)
 
                     errs.append(err_mae)
-                    success.append(is_within * 1)
-                    proportions.append(proportion)
                 else:
                     pred_prev = quantifier.aggregate(sample)
                     err_mae = qp.error.ae(true_prev, pred_prev)
@@ -105,16 +104,11 @@ def job(args):
 
                     errs.append(err_mae)
 
-                print(f'[{(i + 1) / protocol.total()}] '
-                      f'MAE={np.mean(errs):.4f} '
-                      f'Success={100*np.mean(success):.2f}% '
-                      f'Proportion={100*np.mean(proportions):.3f}%')
-                
             # prepare report
             # --------------
             report = pd.DataFrame.from_records(row_entries)
 
-            test_time = time() - t_init
+            test_time = te_time / N_BAGS_TEST
             report['tr_time'] = train_time
             report['te_time'] = test_time
             report.to_csv(local_result_path)
@@ -156,10 +150,10 @@ if __name__ == '__main__':
     qp.environ['N_JOBS'] = N_JOBS
 
     for DATASETS, folder in [
-            (MULTICLASS_DATASETS, 'ucimulti'),
-            # (BINARY_DATASETS, 'binary'),
+            # (MULTICLASS_DATASETS, 'ucimulti'),
+            (BINARY_DATASETS, 'binary'),
         ]:
-        result_dir = f'results/{folder}/{USE_PROTOCOL}'        
+        result_dir = f'results_fake/{folder}/{USE_PROTOCOL}'
         global_result_path = run_experiments(result_dir)
         show_results(global_result_path)
 
