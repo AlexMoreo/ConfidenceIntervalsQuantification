@@ -32,7 +32,7 @@ QUANTIFIERS = [
 
 METHODS = []
 for q, q_name in QUANTIFIERS:
-    for method in ['region', 'clr', 'intervals']:
+    for method in ['region']:#, 'clr', 'intervals']:
         method_prefix = method[:3].title()
         methods = [
             (f'{q_name}-95-tr1-te500-m{method_prefix}', WithCIAgg(q(newLR()), confidence_level=0.95,  n_train_samples=1, n_test_samples=500, method=method)),
