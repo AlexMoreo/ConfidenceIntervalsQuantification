@@ -37,8 +37,6 @@ def collect_results(result_dir, quantifiers):
                 bootstrap = '-'
 
             report = qp.util.load_report(file)
-            if bootstrap != '-':
-                report = add_conf_eval_metric(report)
             report_means = report.mean(numeric_only=True)
 
             series['q_name'] = q_name
@@ -70,7 +68,7 @@ def collect_results(result_dir, quantifiers):
 
     latex_table = pivot.to_latex(
         index=False,  # No incluir el índice de pandas en la tabla
-        float_format="%.1f",  # Formato para los valores numéricos
+        float_format="%.3f",  # Formato para los valores numéricos
         caption="Summary of clocked times grouped by bootstrap and confidence region.",
         label="tab:results"
     )
@@ -85,7 +83,7 @@ if __name__ == '__main__':
         (MULTICLASS_DATASETS, 'ucimulti'),
         (BINARY_DATASETS, 'binary'),
     ]:
-        result_dir = f'results/{folder}/{USE_PROTOCOL}'
+        result_dir = f'results_fake/{folder}/{USE_PROTOCOL}'
 
         quantifiers = ['ACC', 'PACC', 'DM']
 

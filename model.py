@@ -35,13 +35,19 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
                  method='intervals',
                  random_state=None):
 
-        assert isinstance(quantifier, AggregativeQuantifier), f'base quantifier does not seem to be an instance of {AggregativeQuantifier.__name__}'
-        assert n_train_samples >= 1, f'{n_train_samples=} must be >= 1'
-        assert n_test_samples >= 1, f'{n_test_samples=} must be >= 1'
-        assert n_test_samples>1 or n_train_samples>1, f'either {n_test_samples=} or {n_train_samples=} must be >1'
+        assert isinstance(quantifier, AggregativeQuantifier), \
+            f'base quantifier does not seem to be an instance of {AggregativeQuantifier.__name__}'
+        assert n_train_samples >= 1, \
+            f'{n_train_samples=} must be >= 1'
+        assert n_test_samples >= 1, \
+            f'{n_test_samples=} must be >= 1'
+        assert n_test_samples>1 or n_train_samples>1, \
+            f'either {n_test_samples=} or {n_train_samples=} must be >1'
         assert (type(sample_size) == float and sample_size > 0) or (type(sample_size) == int and sample_size > 1), \
             f'wrong value for {sample_size=}; specify a float (a proportion of the original size) or an integer'
-        assert method in self.METHODS, f'unknown method; valid ones are {self.METHODS}'
+        assert method in self.METHODS, \
+            f'unknown method; valid ones are {self.METHODS}'
+
         self.quantifier = quantifier
         self.n_train_samples = n_train_samples
         self.n_test_samples = n_test_samples
@@ -50,13 +56,13 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
         self.method = method
         self.random_state = random_state
 
-    def _return_conf(self, prevs):
+    def _return_conf(self, prevs, confidence_level):
         if self.method == 'intervals':
-            return ConfidenceIntervals(prevs, confidence_level=self.confidence_level)
+            return ConfidenceIntervals(prevs, confidence_level=confidence_level)
         elif self.method == 'region':
-            return ConfidenceRegionSimplex(prevs, confidence_level=self.confidence_level)
+            return ConfidenceRegionSimplex(prevs, confidence_level=confidence_level)
         elif self.method == 'clr':
-            return ConfidenceRegionCLR(prevs, confidence_level=self.confidence_level)
+            return ConfidenceRegionCLR(prevs, confidence_level=confidence_level)
         else:
             raise ValueError(f'unknown method {self.method}')
 
@@ -103,7 +109,7 @@ class WithCIAgg(WithCIAbstract, AggregativeQuantifier):
                     prev_i = quantifier.aggregate(sample_i)
                     prevs.append(prev_i)
 
-        conf = self._return_conf(prevs)
+        conf = self._return_conf(prevs, confidence_level)
         prev_estim = conf.mean()
 
         return prev_estim, conf
