@@ -1,5 +1,0 @@
-1.- Hacer plots en datasets de 3 n_classes, con puntos, valor real, y elipse
-2.- Ver una gráfica de success vs amount of shift
-3.- Ver una gráfica de proportion vs amount of shift
-4.- Tal vez una única gráfica que combine 2 y 3
-5.- Comparar con otros baselines
