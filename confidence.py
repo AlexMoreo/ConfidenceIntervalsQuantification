@@ -222,7 +222,10 @@ class ConfidenceIntervals(ConfidenceSimplexAbstract):
         X = np.asarray(X)
 
         self.means = X.mean(axis=0)
-        I_low, I_high = np.percentile(X, q=[2.5,97.5], axis=0)
+        alpha = 1-confidence_level
+        low_q = (alpha / 2.)*100
+        high_q = (1 - alpha / 2.)*100
+        I_low, I_high = np.percentile(X, q=[low_q, high_q], axis=0)
         self.conf_intervals_low = I_low
         self.conf_intervals_high = I_high
         # self.sem = sem(X, axis=0, ddof=1)

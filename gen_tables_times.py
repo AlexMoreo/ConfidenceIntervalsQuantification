@@ -66,14 +66,46 @@ def collect_results(result_dir, quantifiers):
 
     pivot = pivot.sort_values(['bootstrap', 'conf-region'])
 
-    latex_table = pivot.to_latex(
-        index=False,  # No incluir el índice de pandas en la tabla
-        float_format="%.3f",  # Formato para los valores numéricos
-        caption="Summary of clocked times grouped by bootstrap and confidence region.",
-        label="tab:results"
-    )
+    values = pivot.values
+    tr_times = values[:,2]
+    te_times = values[:,3]
+    tr_orig_time, tr_pop_time, tr_mod_time, tr_comb_time = tr_times
+    te_orig_time, te_pop_time, te_mod_time, te_comb_time = te_times
+    tr_naive_pop_time = tr_orig_time # 1 training
+    tr_pop_time = tr_orig_time # there is only 1 training, we hide possible mismatches between both metrics, which should be the same
+    te_naive_pop_time = te_orig_time * 500 # 500 tests
+    tr_naive_mod_time = tr_orig_time * 500 # 500 trainings
+    te_naive_mod_time = te_orig_time * 500 # although there is no bootstrap in test, there are 500 (trained) models to test
+    tr_naive_comb_time = tr_orig_time * 100
+    te_naive_comb_time = te_orig_time * (100*100)
 
-    return latex_table
+    def rel_red(new, old):
+        rel = 100*(old-new)/old
+        sign = '-' if rel>0 else '+'
+        rel = abs(rel)
+        return f'({sign}{rel:.2f}\%)'
+
+    tab = ['\\begin{table}']
+    tab.append('\\begin{tabular}{llcccc}')
+    tab.append('\\toprule')
+    tab.append('Bootstrap & Implem. & Train time (s) & (\%Rel.Red) & Test time (s) & (\%Rel.Red)\\\\')
+    tab.append('\midrule')
+    tab.append('\\toprule')
+    tab.append(f'None & \\texttt{{QuaPy}} & {tr_orig_time:.3f} & -- & {te_orig_time:.3f} & -- \\\\ \hline')
+    tab.append(f'\multirow{{2}}{{*}}{{population-based}} & Naive & {tr_naive_pop_time:.3f} & -- & {te_naive_pop_time:.3f} & -- \\\\ ')
+    tab.append(f'  & Ours & {tr_pop_time:.3f} & {rel_red(tr_pop_time, tr_naive_pop_time)} & {te_pop_time:.3f} & {rel_red(te_pop_time, te_naive_pop_time)} \\\\ \hline')
+    tab.append(f'\multirow{{2}}{{*}}{{model-based}} & Naive & {tr_naive_mod_time:.3f} & -- & {te_naive_mod_time:.3f} & -- \\\\ ')
+    tab.append(f'  & Ours & {tr_mod_time:.3f} & {rel_red(tr_mod_time, tr_naive_mod_time)} & {te_mod_time:.3f} & {rel_red(te_mod_time, te_naive_mod_time)} \\\\ \hline')
+    tab.append(f'\multirow{{2}}{{*}}{{combined}} & Naive & {tr_naive_comb_time:.3f} & -- & {te_naive_comb_time:.3f} & -- \\\\ ')
+    tab.append(f'  & Ours & {tr_comb_time:.3f} & {rel_red(tr_comb_time, tr_naive_comb_time)} & {te_comb_time:.3f} & {rel_red(te_comb_time, te_naive_comb_time)} \\\\ ')
+    tab.append('\\bottomrule')
+    tab.append('\end{tabular}')
+    tab.append('\caption{Summary of clocked times grouped by bootstrap.}')
+    tab.append('\label{tab:results}')
+    tab.append('\end{table}')
+
+    return '\n'.join(tab)
+
 
 if __name__ == '__main__':
 
